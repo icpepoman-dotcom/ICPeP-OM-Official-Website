@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Spectral", Georgia, serif;
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  
+  --color-ink: #12203A;
+  --color-ink-muted: #3B475C;
+  --color-ink-faint: #6A778D;
+  --color-brass: #C99A2E;
+  --color-brass-dark: #A67B1E;
+  --color-brass-light: #F7EECD;
+  --color-clay: #9C3B2E;
+  --color-clay-dark: #7F2D22;
+  --color-clay-light: #F8ECE9;
+  --color-paper: #EEEEE7;
+  --color-paper-warm: #F6F6F2;
+  --color-paper-shade: #E3E3D8;
+  --color-paper-border: #CDCDC0;
+  --color-paper-rule: #BFBFB0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4, .font-heading {
+  font-family: var(--font-serif);
+}
+
+/* Subtle technical drafting grid for engineering aesthetics */
+.drafting-grid {
+  background-image: 
+    linear-gradient(to right, rgba(18, 32, 58, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(18, 32, 58, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.drafting-grid-dense {
+  background-image: 
+    linear-gradient(to right, rgba(18, 32, 58, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(18, 32, 58, 0.05) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+/* Blueprint section ruler line */
+.draft-line {
+  border-color: #CDCDC0;
+}
+
+/* Print-like custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #EEEEE7;
+}
+::-webkit-scrollbar-thumb {
+  background: #C4C4B5;
+  border-radius: 0px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #A67B1E;
+}
+
+/* Gear-like mechanical rotation animation for engineering logo */
+@keyframes gear-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.logo-gear-svg {
+  transform-origin: 50% 50%;
+  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+
+.group:hover .logo-gear-svg,
+.logo-gear-svg:hover {
+  animation: gear-rotate 8s linear infinite;
+}
+

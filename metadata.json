@@ -1,0 +1,7 @@
+{
+  "name": "ICpEP-Oman — Institute of Computer Engineers of the Philippines (Oman Chapter)",
+  "description": "Official website of the Institute of Computer Engineers of the Philippines — Oman Chapter. Connecting professionals, advancing technology, building the future.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
