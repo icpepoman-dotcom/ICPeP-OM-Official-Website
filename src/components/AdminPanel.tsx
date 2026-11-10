@@ -3,6 +3,7 @@ import { useContent, AdminUserRole } from '../context/ContentContext';
 import { RegistrationsManager } from './RegistrationsManager';
 import { MediaManager } from './MediaManager';
 import { AdminUsersManager } from './AdminUsersManager';
+import { GitHubPublisherManager } from './GitHubPublisherManager';
 import {
   X,
   RotateCcw,
@@ -30,6 +31,9 @@ import {
   LogOut,
   CheckCircle2,
   Key,
+  FolderGit2,
+  Github,
+  UploadCloud,
 } from 'lucide-react';
 import { Officer, UpcomingEvent, PastEvent, DevTrack, PartnerItem, Announcement, FAQItem } from '../data/content';
 
@@ -502,6 +506,12 @@ export const AdminPanel: React.FC = () => {
 
   const navTabs = [
     {
+      id: 'github-publisher',
+      label: '★ GitHub Publish & Sync',
+      icon: <FolderGit2 className="w-3.5 h-3.5 text-[#C99A2E]" />,
+      badge: 'LIVE',
+    },
+    {
       id: 'admin-users',
       label: '★ Admin Users & Access Monitor',
       icon: <ShieldCheck className="w-3.5 h-3.5 text-[#C99A2E]" />,
@@ -576,6 +586,16 @@ export const AdminPanel: React.FC = () => {
                 SAVED: {lastSaved}
               </span>
             )}
+
+            <button
+              onClick={() => setActiveTab('github-publisher')}
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#1C2F54] hover:bg-[#253D6D] text-[#C99A2E] border border-[#C99A2E] font-mono text-xs uppercase font-bold transition-all shadow-xs"
+              title="Save, Upload and Publish Modifications to GitHub"
+            >
+              <Github className="w-3.5 h-3.5 text-white" />
+              <span className="hidden sm:inline">Publish to GitHub</span>
+              <span className="sm:hidden">GitHub</span>
+            </button>
 
             <button
               onClick={() => setActiveTab('admin-users')}
@@ -659,6 +679,9 @@ export const AdminPanel: React.FC = () => {
           {/* Tab Content Panel */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[#F6F6F2]">
             
+            {/* TAB GITHUB PUBLISHER & SYNC */}
+            {activeTab === 'github-publisher' && <GitHubPublisherManager />}
+
             {/* TAB ADMIN USERS & SECURITY MONITOR */}
             {activeTab === 'admin-users' && <AdminUsersManager />}
 

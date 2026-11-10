@@ -90,7 +90,8 @@ export type AccessActionType =
   | 'MEMBER_STATUS_CHANGED'
   | 'DATABASE_EXPORTED'
   | 'SECURITY_MODE_CHANGED'
-  | 'SESSION_TERMINATED';
+  | 'SESSION_TERMINATED'
+  | 'GITHUB_PUBLISHED';
 
 export interface AdminAccessLog {
   id: string;

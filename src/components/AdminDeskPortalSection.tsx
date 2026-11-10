@@ -17,6 +17,9 @@ import {
   Eye,
   KeyRound,
   Laptop,
+  FolderGit2,
+  Github,
+  UploadCloud,
 } from 'lucide-react';
 
 export const AdminDeskPortalSection: React.FC = () => {
@@ -93,7 +96,7 @@ export const AdminDeskPortalSection: React.FC = () => {
             </p>
           </div>
 
-          {/* Quick Dual Action Controls */}
+          {/* Quick Action Controls */}
           <div className="flex flex-wrap items-center gap-3 shrink-0">
             <button
               type="button"
@@ -111,8 +114,18 @@ export const AdminDeskPortalSection: React.FC = () => {
 
             <button
               type="button"
+              onClick={() => setIsAdminOpen(true)}
+              className="inline-flex items-center gap-2 bg-[#1C2F54] hover:bg-[#253D6D] text-[#C99A2E] px-4 py-3 text-xs sm:text-sm font-mono tracking-wider uppercase border border-[#C99A2E] transition-all shadow-sm group"
+              title="Open GitHub publishing console"
+            >
+              <Github className="w-4 h-4 text-white" />
+              <span className="font-bold">Publish to GitHub</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setIsRegisterModalOpen(true)}
-              className="inline-flex items-center gap-2 bg-white hover:bg-[#F6F6F2] text-[#12203A] px-5 py-3 text-xs sm:text-sm font-mono tracking-wider uppercase border-2 border-[#12203A] hover:border-[#C99A2E] transition-all shadow-sm group"
+              className="inline-flex items-center gap-2 bg-white hover:bg-[#F6F6F2] text-[#12203A] px-4 py-3 text-xs sm:text-sm font-mono tracking-wider uppercase border-2 border-[#12203A] hover:border-[#C99A2E] transition-all shadow-sm group"
             >
               <UserPlus className="w-4 h-4 text-[#9C3B2E]" />
               <span className="font-bold">Register Admin User</span>
