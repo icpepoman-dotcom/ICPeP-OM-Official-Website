@@ -16,6 +16,28 @@
   <body class="bg-[#EEEEE7] text-[#12203A] antialiased selection:bg-[#C99A2E]/25 selection:text-[#12203A]">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          var root = document.getElementById('root');
+          var hasRawTsx = Array.prototype.some.call(document.scripts, function (s) {
+            return s.src && s.src.indexOf('/src/main.tsx') !== -1;
+          });
+          if (hasRawTsx && root && root.childElementCount === 0) {
+            root.innerHTML =
+              '<div style="max-width:640px;margin:48px auto;padding:28px;border:2px solid #12203A;background:#F6F6F2;font-family:monospace;color:#12203A;line-height:1.6;">' +
+              '<div style="color:#9C3B2E;font-weight:bold;text-transform:uppercase;font-size:12px;margin-bottom:8px;">GitHub Pages Build Configuration Required</div>' +
+              '<h1 style="font-family:serif;font-size:22px;margin:0 0 12px 0;">This host is serving raw source files instead of the compiled bundle.</h1>' +
+              '<p style="font-size:13px;margin:0 0 12px 0;">Browsers block <code>/src/main.tsx</code> on static hosts because <code>.tsx</code> is served as <code>application/octet-stream</code>.</p>' +
+              '<ol style="font-size:13px;padding-left:20px;margin:0;">' +
+              '<li>Open your GitHub repository <strong>Settings → Pages</strong>.</li>' +
+              '<li>Under <strong>Build and deployment → Source</strong>, select <strong>GitHub Actions</strong> (instead of Deploy from a branch).</li>' +
+              '<li>Run or re-run the <strong>Deploy to GitHub Pages</strong> workflow under the <strong>Actions</strong> tab.</li>' +
+              '</ol></div>';
+          }
+        }, 1200);
+      });
+    </script>
   </body>
 </html>
 
