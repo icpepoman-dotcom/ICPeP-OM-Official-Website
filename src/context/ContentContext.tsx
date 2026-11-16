@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { siteContent, SiteContent } from '../data/content';
+import { hashAdminCredential, sha256Hex } from '../utils/crypto';
 
 export type RegistrationStatus = 'Pending Review' | 'Verified' | 'Approved' | 'Requires Clarification';
 
@@ -40,7 +41,7 @@ export interface AdminUser {
   id: string;
   name: string;
   email: string;
-  password: string;
+  credentialHash?: string;
   role: AdminUserRole;
   prcLicense?: string;
   chapterPosition?: string;
@@ -113,7 +114,9 @@ interface ContentContextType {
   isAdminOpen: boolean;
   setIsAdminOpen: (open: boolean) => void;
   isAuthenticated: boolean;
+  isVaultConfigured: boolean;
   currentUser: AdminUser | null;
+  initializeAdminVault: (email: string, passcode: string) => { success: boolean; error?: string; user?: AdminUser };
   login: (passcodeOrEmail: string, optionalPassword?: string) => { success: boolean; error?: string; user?: AdminUser };
   logout: () => void;
   lastSaved: string | null;
@@ -128,8 +131,8 @@ interface ContentContextType {
   // Admin Users & Security Management
   adminUsers: AdminUser[];
   accessLogs: AdminAccessLog[];
-  addAdminUser: (userData: Omit<AdminUser, 'id' | 'createdDate' | 'lastLogin'>) => AdminUser;
-  updateAdminUser: (id: string, updates: Partial<AdminUser>) => void;
+  addAdminUser: (userData: Omit<AdminUser, 'id' | 'createdDate' | 'lastLogin' | 'credentialHash'> & { passcode: string }) => AdminUser;
+  updateAdminUser: (id: string, updates: Partial<AdminUser> & { newPasscode?: string }) => void;
   deleteAdminUser: (id: string) => boolean;
   requestAdminAccess: (req: {
     name: string;
@@ -138,7 +141,7 @@ interface ContentContextType {
     chapterPosition?: string;
     requestedRole: AdminUserRole;
     reason: string;
-    passcode?: string;
+    passcode: string;
   }) => { success: boolean; message: string; reqId: string };
   approveAdminRequest: (id: string, assignedRole?: AdminUserRole) => void;
   rejectAdminRequest: (id: string) => void;
@@ -174,7 +177,8 @@ const AUTH_KEY = 'icpep_oman_admin_auth';
 const CURRENT_USER_KEY = 'icpep_oman_current_user_v1';
 const ADMIN_USERS_KEY = 'icpep_oman_admin_users_v1';
 const ACCESS_LOGS_KEY = 'icpep_oman_access_logs_v1';
-const ADMIN_PASSCODE = 'icpep2026';
+const VAULT_CONFIGURED_KEY = 'icpep_oman_vault_configured_v1';
+const ENV_ADMIN_HASH = (import.meta.env.VITE_ADMIN_PASSCODE_HASH as string | undefined)?.trim() || '';
 
 // Seed demo registrations for realistic immediate view
 const SEED_REGISTRATIONS: MemberRegistrationRecord[] = [
@@ -276,7 +280,6 @@ const SEED_ADMIN_USERS: AdminUser[] = [
     id: 'ADM-01',
     name: 'Engr. Michael Ray C. Del Rosario',
     email: 'icpep.oman@gmail.com',
-    password: 'icpep2026',
     role: 'Super Admin',
     prcLicense: 'PRC Reg. No. 008129',
     chapterPosition: 'Chapter President & Charter Trustee',
@@ -290,7 +293,6 @@ const SEED_ADMIN_USERS: AdminUser[] = [
     id: 'ADM-02',
     name: 'Engr. Maria Theresa Santos',
     email: 'secretariat.oman@icpep.ph',
-    password: 'icpep2026',
     role: 'Secretariat Officer',
     prcLicense: 'PRC Reg. No. 014521',
     chapterPosition: 'Secretary General & Records Registrar',
@@ -304,7 +306,6 @@ const SEED_ADMIN_USERS: AdminUser[] = [
     id: 'ADM-03',
     name: 'Engr. Jose Rizalino D. Cruz',
     email: 'auditor.oman@icpep.ph',
-    password: 'icpep2026',
     role: 'Auditor / Observer',
     prcLicense: 'PRC Reg. No. 009412',
     chapterPosition: 'Chapter Auditor & Compliance Lead',
@@ -318,7 +319,6 @@ const SEED_ADMIN_USERS: AdminUser[] = [
     id: 'ADM-REQ-01',
     name: 'Engr. Arnel B. Valencia',
     email: 'arnel.valencia@telecom.om',
-    password: 'icpep2026',
     role: 'Secretariat Officer',
     prcLicense: 'PRC Reg. No. 018932',
     chapterPosition: 'C&I Committee Co-Chair',
@@ -439,7 +439,13 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
           ...siteContent,
           ...parsed,
           brand: { ...siteContent.brand, ...(parsed.brand || {}) },
-          hero: { ...siteContent.hero, ...(parsed.hero || {}) },
+          hero: {
+            ...siteContent.hero,
+            ...(parsed.hero || {}),
+            draftingSpec: { ...siteContent.hero.draftingSpec, ...(parsed.hero?.draftingSpec || {}) },
+            ctaPrimary: { ...siteContent.hero.ctaPrimary, ...(parsed.hero?.ctaPrimary || {}) },
+            ctaSecondary: { ...siteContent.hero.ctaSecondary, ...(parsed.hero?.ctaSecondary || {}) },
+          },
           about: {
             ...siteContent.about,
             ...(parsed.about || {}),
@@ -447,14 +453,42 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
               ...siteContent.about.presidentsMessage,
               ...(parsed.about?.presidentsMessage || {}),
             },
-            officers: parsed.about?.officers || siteContent.about.officers,
+            objectives: Array.isArray(parsed.about?.objectives)
+              ? parsed.about.objectives
+              : siteContent.about.objectives,
+            coreValues: Array.isArray(parsed.about?.coreValues)
+              ? parsed.about.coreValues
+              : siteContent.about.coreValues,
+            officers: Array.isArray(parsed.about?.officers)
+              ? parsed.about.officers
+              : siteContent.about.officers,
+          },
+          membership: {
+            ...siteContent.membership,
+            ...(parsed.membership || {}),
+            benefits: Array.isArray(parsed.membership?.benefits)
+              ? parsed.membership.benefits
+              : siteContent.membership.benefits,
+            categories: Array.isArray(parsed.membership?.categories)
+              ? parsed.membership.categories
+              : siteContent.membership.categories,
+            processSteps: Array.isArray(parsed.membership?.processSteps)
+              ? parsed.membership.processSteps
+              : siteContent.membership.processSteps,
           },
           events: {
             ...siteContent.events,
             ...(parsed.events || {}),
-            upcoming: parsed.events?.upcoming || siteContent.events.upcoming,
+            upcoming: Array.isArray(parsed.events?.upcoming) ? parsed.events.upcoming : siteContent.events.upcoming,
+            past: Array.isArray(parsed.events?.past) ? parsed.events.past : siteContent.events.past,
           },
-          gallery: parsed.gallery || siteContent.gallery,
+          contact: {
+            ...siteContent.contact,
+            ...(parsed.contact || {}),
+            details: { ...siteContent.contact.details, ...(parsed.contact?.details || {}) },
+          },
+          footer: { ...siteContent.footer, ...(parsed.footer || {}) },
+          gallery: Array.isArray(parsed.gallery) ? parsed.gallery : siteContent.gallery,
         };
       }
     } catch (e) {
@@ -472,16 +506,38 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   });
 
-  // Admin users state
+  // Admin users state (automatically migrates any legacy plaintext field to credentialHash)
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>(() => {
     try {
       const saved = localStorage.getItem(ADMIN_USERS_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Array<AdminUser & { password?: string }>;
+        if (Array.isArray(parsed)) {
+          return parsed.map(({ password: legacySecret, ...rest }) => ({
+            ...rest,
+            credentialHash:
+              rest.credentialHash ||
+              (legacySecret && rest.email ? hashAdminCredential(rest.email, legacySecret) : undefined),
+          }));
+        }
+      }
     } catch (e) {
       console.warn('Failed to parse admin users:', e);
     }
     return SEED_ADMIN_USERS;
   });
+
+  const isVaultConfigured = Boolean(
+    ENV_ADMIN_HASH ||
+    adminUsers.some((u) => u.status === 'Active' && Boolean(u.credentialHash)) ||
+    (() => {
+      try {
+        return localStorage.getItem(VAULT_CONFIGURED_KEY) === 'true';
+      } catch {
+        return false;
+      }
+    })()
+  );
 
   // Access audit logs state
   const [accessLogs, setAccessLogs] = useState<AdminAccessLog[]>(() => {
@@ -714,7 +770,7 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       content,
       registrations,
       eventRsvps,
-      adminUsers: adminUsers.map((u) => ({ ...u, password: '***' })),
+      adminUsers: adminUsers.map(({ credentialHash: _omitted, ...rest }) => rest),
       accessLogs,
       exportDate: new Date().toISOString(),
       system: 'ICpEP-Oman Secretariat Database',
@@ -759,13 +815,97 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Secure User-Specific & Master Passcode Login
+  // First-time local admin vault initialization (avoids shipping hardcoded secrets in source code)
+  const initializeAdminVault = (
+    email: string,
+    passcode: string
+  ): { success: boolean; error?: string; user?: AdminUser } => {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPass = passcode.trim();
+
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, error: 'Please enter a valid administrator email address.' };
+    }
+    if (cleanPass.length < 6) {
+      return { success: false, error: 'Security passphrase must be at least 6 characters.' };
+    }
+
+    const existing = adminUsers.find((u) => u.email.toLowerCase() === cleanEmail);
+    if (existing && existing.status !== 'Active') {
+      return { success: false, error: 'Selected account is not Active. Choose an active chapter officer account.' };
+    }
+
+    const newHash = hashAdminCredential(cleanEmail, cleanPass);
+    const nowFormatted = new Date().toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' });
+
+    let activatedUser: AdminUser;
+    if (existing) {
+      activatedUser = {
+        ...existing,
+        credentialHash: newHash,
+        lastLogin: nowFormatted,
+      };
+      setAdminUsers((prev) => {
+        const updated = prev.map((u) => (u.id === existing.id ? activatedUser : u));
+        try {
+          localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+    } else {
+      activatedUser = {
+        id: `ADM-${Date.now().toString().slice(-4)}`,
+        name: cleanEmail.split('@')[0],
+        email: cleanEmail,
+        credentialHash: newHash,
+        role: 'Super Admin',
+        chapterPosition: 'Chapter Administrator',
+        status: 'Active',
+        createdDate: new Date().toLocaleDateString('en-US', { dateStyle: 'medium' }),
+        lastLogin: nowFormatted,
+        twoFactorEnabled: false,
+      };
+      setAdminUsers((prev) => {
+        const updated = [activatedUser, ...prev];
+        try {
+          localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+    }
+
+    setCurrentUser(activatedUser);
+    setIsAuthenticated(true);
+    try {
+      localStorage.setItem(VAULT_CONFIGURED_KEY, 'true');
+      localStorage.setItem(AUTH_KEY, 'true');
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(activatedUser));
+    } catch {}
+
+    logAccessEvent(
+      'LOGIN_SUCCESS',
+      activatedUser.email,
+      activatedUser.name,
+      `Secretariat admin vault initialized and authenticated as ${activatedUser.role}.`,
+      'info'
+    );
+
+    return { success: true, user: activatedUser };
+  };
+
+  // Secure User-Specific Hashed Credential Login
   const login = (
     passcodeOrEmail: string,
     optionalPassword?: string
   ): { success: boolean; error?: string; user?: AdminUser } => {
     const identifier = passcodeOrEmail.trim().toLowerCase();
     const providedPasscode = (optionalPassword || passcodeOrEmail).trim();
+
+    if (!providedPasscode) {
+      return { success: false, error: 'Please enter your administrator passphrase.' };
+    }
+
+    const matchesEnvOverride = Boolean(ENV_ADMIN_HASH && sha256Hex(providedPasscode) === ENV_ADMIN_HASH);
 
     // 1. Try matching registered admin user
     const foundUser = adminUsers.find(
@@ -798,12 +938,19 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return { success: false, error: 'Your admin registration request is currently pending Executive Board approval.' };
       }
 
-      // Check passcode
-      if (
-        foundUser.password === providedPasscode ||
-        providedPasscode.toLowerCase() === ADMIN_PASSCODE ||
-        providedPasscode.toLowerCase() === 'admin'
-      ) {
+      if (!foundUser.credentialHash && !matchesEnvOverride) {
+        return {
+          success: false,
+          error: 'No passphrase configured for this officer yet. Use First-Time Setup or ask a Super Admin to assign a key.',
+        };
+      }
+
+      const matchesUserHash = Boolean(
+        foundUser.credentialHash &&
+        hashAdminCredential(foundUser.email, providedPasscode) === foundUser.credentialHash
+      );
+
+      if (matchesUserHash || matchesEnvOverride) {
         const updatedUser: AdminUser = {
           ...foundUser,
           lastLogin: new Date().toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' }),
@@ -853,15 +1000,15 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
           'LOGIN_FAILED',
           foundUser.email,
           foundUser.name,
-          'Failed login attempt: Incorrect password.',
+          'Failed login attempt: Incorrect passphrase.',
           'security'
         );
-        return { success: false, error: 'Incorrect password for this administrator account.' };
+        return { success: false, error: 'Incorrect passphrase for this administrator account.' };
       }
     }
 
-    // 2. Master Emergency Passcode match
-    if (identifier === ADMIN_PASSCODE || identifier === 'admin' || providedPasscode.toLowerCase() === ADMIN_PASSCODE) {
+    // 2. Build-time CI/CD environment override match (if configured)
+    if (matchesEnvOverride) {
       const rootUser = adminUsers.find((u) => u.role === 'Super Admin') || SEED_ADMIN_USERS[0];
       setCurrentUser(rootUser);
       setIsAuthenticated(true);
@@ -888,7 +1035,7 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         'LOGIN_SUCCESS',
         rootUser.email,
         rootUser.name,
-        'Master emergency key used. Authenticated as Super Admin.',
+        'Environment-verified Super Admin session authenticated.',
         'info'
       );
 
@@ -902,7 +1049,7 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       `Failed authentication attempt for identifier: "${identifier}".`,
       'security'
     );
-    return { success: false, error: 'Unrecognized administrator email or invalid passcode.' };
+    return { success: false, error: 'Unrecognized administrator email or invalid passphrase.' };
   };
 
   const logout = () => {
@@ -921,19 +1068,24 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // ---------------------------------------------------------------------------
   // ADMIN USERS CRUD ACTIONS
   // ---------------------------------------------------------------------------
-  const addAdminUser = (userData: Omit<AdminUser, 'id' | 'createdDate' | 'lastLogin'>): AdminUser => {
+  const addAdminUser = (
+    userData: Omit<AdminUser, 'id' | 'createdDate' | 'lastLogin' | 'credentialHash'> & { passcode: string }
+  ): AdminUser => {
+    const { passcode, ...rest } = userData;
     const newUser: AdminUser = {
-      ...userData,
+      ...rest,
+      credentialHash: hashAdminCredential(rest.email, passcode),
       id: `ADM-${Date.now().toString().slice(-4)}`,
       createdDate: new Date().toLocaleDateString('en-US', { dateStyle: 'medium' }),
       lastLogin: null,
-      status: userData.status || 'Active',
+      status: rest.status || 'Active',
     };
 
     setAdminUsers((prev) => {
       const updated = [newUser, ...prev];
       try {
         localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(updated));
+        localStorage.setItem(VAULT_CONFIGURED_KEY, 'true');
       } catch (e) {
         console.error('Failed to save admin users:', e);
       }
@@ -951,26 +1103,34 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return newUser;
   };
 
-  const updateAdminUser = (id: string, updates: Partial<AdminUser>) => {
+  const updateAdminUser = (id: string, updates: Partial<AdminUser> & { newPasscode?: string }) => {
+    const { newPasscode, ...restUpdates } = updates;
     setAdminUsers((prev) => {
       const updated = prev.map((u) => {
         if (u.id === id) {
-          const merged = { ...u, ...updates };
-          if (updates.status && updates.status !== u.status) {
+          const nextHash = newPasscode
+            ? hashAdminCredential(restUpdates.email || u.email, newPasscode)
+            : restUpdates.credentialHash || u.credentialHash;
+          const merged: AdminUser = {
+            ...u,
+            ...restUpdates,
+            credentialHash: nextHash,
+          };
+          if (restUpdates.status && restUpdates.status !== u.status) {
             logAccessEvent(
-              updates.status === 'Suspended' ? 'USER_SUSPENDED' : 'USER_APPROVED',
+              restUpdates.status === 'Suspended' ? 'USER_SUSPENDED' : 'USER_APPROVED',
               u.email,
               u.name,
-              `Status transitioned from "${u.status}" to "${updates.status}" by ${currentUser?.name || 'Super Admin'}.`,
-              updates.status === 'Suspended' ? 'security' : 'info'
+              `Status transitioned from "${u.status}" to "${restUpdates.status}" by ${currentUser?.name || 'Super Admin'}.`,
+              restUpdates.status === 'Suspended' ? 'security' : 'info'
             );
           }
-          if (updates.password && updates.password !== u.password) {
+          if (newPasscode) {
             logAccessEvent(
               'PASSWORD_CHANGED',
               u.email,
               u.name,
-              `Password reset for user ${u.id} by ${currentUser?.name || 'Super Admin'}.`,
+              `Passphrase updated for user ${u.id} by ${currentUser?.name || 'Super Admin'}.`,
               'warning'
             );
           }
@@ -1024,7 +1184,7 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     chapterPosition?: string;
     requestedRole: AdminUserRole;
     reason: string;
-    passcode?: string;
+    passcode: string;
   }): { success: boolean; message: string; reqId: string } => {
     const existing = adminUsers.find((u) => u.email.toLowerCase() === req.email.toLowerCase());
     if (existing) {
@@ -1040,7 +1200,7 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       id: reqId,
       name: req.name,
       email: req.email,
-      password: req.passcode || 'icpep2026',
+      credentialHash: hashAdminCredential(req.email, req.passcode),
       role: req.requestedRole || 'Secretariat Officer',
       prcLicense: req.prcLicense,
       chapterPosition: req.chapterPosition,
@@ -1338,7 +1498,9 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         isAdminOpen,
         setIsAdminOpen,
         isAuthenticated,
+        isVaultConfigured,
         currentUser,
+        initializeAdminVault,
         login,
         logout,
         lastSaved,

@@ -808,7 +808,7 @@ git push origin ${config.branch}`;
                 type={showToken ? 'text' : 'password'}
                 value={config.token}
                 onChange={(e) => setConfig({ ...config, token: e.target.value })}
-                placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                placeholder="Enter your GitHub Personal Access Token (PAT)"
                 className="w-full px-3 py-2 pr-10 bg-[#F6F6F2] border border-[#12203A] text-xs font-mono text-[#12203A] focus:outline-hidden"
               />
               <button
@@ -979,7 +979,7 @@ git push origin ${config.branch}`}
               When modifications are pushed to <code>{config.branch}</code>, your repository's automated CI/CD workflow will automatically build and publish the changes:
             </p>
             <ul className="list-disc pl-5 space-y-1 font-mono text-xs text-[#12203A]">
-              <li>GitHub Pages: Automated rebuild upon new commit to <code>main</code>.</li>
+              <li>GitHub Pages: Uses <code>.github/workflows/deploy.yml</code> to build <code>dist/</code> with relative asset paths. Set repository Settings → Pages → Source to <strong>GitHub Actions</strong> to avoid a blank white screen.</li>
               <li>Google Cloud Run / AI Studio: Syncs automatically with repository changes.</li>
               <li>PRC Accreditation Archival: Every commit SHA provides an immutable audit trail for governance compliance.</li>
             </ul>

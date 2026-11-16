@@ -47,8 +47,10 @@ export const AdminPanel: React.FC = () => {
     isAdminOpen,
     setIsAdminOpen,
     isAuthenticated,
+    isVaultConfigured,
     currentUser,
     adminUsers,
+    initializeAdminVault,
     login,
     logout,
     lastSaved,
@@ -64,7 +66,8 @@ export const AdminPanel: React.FC = () => {
   // Authentication barrier state
   const [loginMode, setLoginMode] = useState<'signin' | 'register'>('signin');
   const [loginEmail, setLoginEmail] = useState('icpep.oman@gmail.com');
-  const [loginPasscode, setLoginPasscode] = useState('icpep2026');
+  const [loginPasscode, setLoginPasscode] = useState('');
+  const [confirmPasscode, setConfirmPasscode] = useState('');
   const [loginErrorMessage, setLoginErrorMessage] = useState<string | null>(null);
 
   // Self-service admin registration request form state
@@ -73,7 +76,7 @@ export const AdminPanel: React.FC = () => {
   const [reqPrc, setReqPrc] = useState('');
   const [reqPosition, setReqPosition] = useState('');
   const [reqRole, setReqRole] = useState<AdminUserRole>('Secretariat Officer');
-  const [reqPasscode, setReqPasscode] = useState('icpep2026');
+  const [reqPasscode, setReqPasscode] = useState('');
   const [reqReason, setReqReason] = useState('');
   const [reqError, setReqError] = useState<string | null>(null);
   const [reqSuccessDossier, setReqSuccessDossier] = useState<string | null>(null);
@@ -85,6 +88,23 @@ export const AdminPanel: React.FC = () => {
     const handleLoginSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       setLoginErrorMessage(null);
+
+      if (!isVaultConfigured) {
+        if (loginPasscode.trim().length < 6) {
+          setLoginErrorMessage('Security passphrase must be at least 6 characters.');
+          return;
+        }
+        if (loginPasscode !== confirmPasscode) {
+          setLoginErrorMessage('Passphrase confirmation does not match.');
+          return;
+        }
+        const res = initializeAdminVault(loginEmail, loginPasscode);
+        if (!res.success) {
+          setLoginErrorMessage(res.error || 'Unable to initialize administrator vault.');
+        }
+        return;
+      }
+
       const res = login(loginEmail, loginPasscode);
       if (!res.success) {
         setLoginErrorMessage(res.error || 'Authentication rejected. Verify your credentials.');
@@ -100,6 +120,11 @@ export const AdminPanel: React.FC = () => {
         return;
       }
 
+      if (reqPasscode.trim().length < 6) {
+        setReqError('Please choose a security passcode of at least 6 characters.');
+        return;
+      }
+
       const res = requestAdminAccess({
         name: reqName.trim(),
         email: reqEmail.trim().toLowerCase(),
@@ -107,7 +132,7 @@ export const AdminPanel: React.FC = () => {
         chapterPosition: reqPosition.trim() || undefined,
         requestedRole: reqRole,
         reason: reqReason.trim(),
-        passcode: reqPasscode.trim() || 'icpep2026',
+        passcode: reqPasscode.trim(),
       });
 
       if (!res.success) {
@@ -179,25 +204,38 @@ export const AdminPanel: React.FC = () => {
             </button>
           </div>
 
-          {/* MODE 1: SIGN IN */}
+          {/* MODE 1: SIGN IN OR FIRST-TIME VAULT SETUP */}
           {loginMode === 'signin' && (
             <div className="space-y-4">
-              <p className="text-xs text-[#3B475C] font-mono leading-relaxed">
-                Enter your authorized administrator credentials or chapter master key to manage site content, review
-                registrations, and inspect access logs.
-              </p>
+              {!isVaultConfigured ? (
+                <div className="p-3 bg-[#12203A]/5 border border-[#C99A2E] text-xs font-mono text-[#12203A] space-y-1">
+                  <div className="font-bold text-[#9C3B2E] uppercase flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5" />
+                    <span>First-Time Secretariat Vault Setup</span>
+                  </div>
+                  <p className="text-[11px] text-[#3B475C] leading-relaxed">
+                    No plaintext passcodes are stored in the repository. Select or enter your chapter administrator email and create a personal SHA-256 protected passphrase for this browser vault.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-[#3B475C] font-mono leading-relaxed">
+                  Enter your authorized administrator email and passphrase to manage site content, review registrations, and inspect access logs.
+                </p>
+              )}
 
-              {/* Quick Profile Selectors for Fast Verification */}
+              {/* Quick Profile Selectors (Email Only - No Hardcoded Passwords) */}
               <div className="bg-[#EEEEE7] p-2.5 border border-[#CDCDC0] space-y-1.5">
                 <span className="font-mono text-[10px] text-[#6A778D] uppercase font-bold block">
-                  Quick Authorized Profile Selection (Testing & Verification):
+                  Quick Officer Email Selection:
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                   <button
                     type="button"
                     onClick={() => {
                       setLoginEmail('icpep.oman@gmail.com');
-                      setLoginPasscode('icpep2026');
+                      setLoginPasscode('');
+                      setConfirmPasscode('');
+                      setLoginErrorMessage(null);
                     }}
                     className={`p-1.5 border text-left font-mono text-[10px] transition-colors ${
                       loginEmail === 'icpep.oman@gmail.com'
@@ -213,7 +251,9 @@ export const AdminPanel: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setLoginEmail('secretariat.oman@icpep.ph');
-                      setLoginPasscode('icpep2026');
+                      setLoginPasscode('');
+                      setConfirmPasscode('');
+                      setLoginErrorMessage(null);
                     }}
                     className={`p-1.5 border text-left font-mono text-[10px] transition-colors ${
                       loginEmail === 'secretariat.oman@icpep.ph'
@@ -229,7 +269,9 @@ export const AdminPanel: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setLoginEmail('auditor.oman@icpep.ph');
-                      setLoginPasscode('icpep2026');
+                      setLoginPasscode('');
+                      setConfirmPasscode('');
+                      setLoginErrorMessage(null);
                     }}
                     className={`p-1.5 border text-left font-mono text-[10px] transition-colors ${
                       loginEmail === 'auditor.oman@icpep.ph'
@@ -246,12 +288,12 @@ export const AdminPanel: React.FC = () => {
               <form onSubmit={handleLoginSubmit} className="space-y-3 font-mono text-xs">
                 <div>
                   <label className="block font-bold text-[#12203A] uppercase mb-1">
-                    Official Admin Email or User ID
+                    Official Admin Email
                   </label>
                   <input
-                    type="text"
+                    type="email"
                     required
-                    placeholder="icpep.oman@gmail.com or passcode"
+                    placeholder="icpep.oman@gmail.com"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     className="w-full p-2.5 bg-white border border-[#CDCDC0] focus:border-[#12203A] focus:outline-hidden text-sm text-[#12203A]"
@@ -261,19 +303,37 @@ export const AdminPanel: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block font-bold text-[#12203A] uppercase">
-                      Passcode / Master Key
+                      {!isVaultConfigured ? 'Create Security Passphrase *' : 'Security Passphrase *'}
                     </label>
-                    <span className="text-[10px] text-[#6A778D]">Default: icpep2026</span>
+                    <span className="text-[10px] text-[#6A778D]">SHA-256 Protected</span>
                   </div>
                   <input
                     type="password"
                     required
-                    placeholder="Enter password"
+                    minLength={6}
+                    placeholder={!isVaultConfigured ? 'Set a passphrase (min. 6 characters)' : 'Enter your passphrase'}
                     value={loginPasscode}
                     onChange={(e) => setLoginPasscode(e.target.value)}
                     className="w-full p-2.5 bg-white border border-[#CDCDC0] focus:border-[#12203A] focus:outline-hidden text-sm text-[#12203A]"
                   />
                 </div>
+
+                {!isVaultConfigured && (
+                  <div>
+                    <label className="block font-bold text-[#12203A] uppercase mb-1">
+                      Confirm Security Passphrase *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      placeholder="Re-enter passphrase to initialize vault"
+                      value={confirmPasscode}
+                      onChange={(e) => setConfirmPasscode(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-[#CDCDC0] focus:border-[#12203A] focus:outline-hidden text-sm text-[#12203A]"
+                    />
+                  </div>
+                )}
 
                 {loginErrorMessage && (
                   <div className="p-2.5 bg-[#9C3B2E]/10 border border-[#9C3B2E] text-xs font-mono text-[#9C3B2E] flex items-start gap-1.5">
@@ -287,15 +347,9 @@ export const AdminPanel: React.FC = () => {
                     type="submit"
                     className="flex-1 py-2.5 bg-[#12203A] text-[#EEEEE7] hover:bg-[#1C2F54] font-mono text-xs uppercase tracking-wider border border-[#C99A2E] font-bold transition-all shadow-xs"
                   >
-                    Authenticate & Enter Desk →
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => login('icpep2026')}
-                    className="px-3 py-2.5 bg-[#EEEEE7] hover:bg-[#E3E3D8] text-[#12203A] font-mono text-xs border border-[#CDCDC0]"
-                    title="Quick unlock with master key"
-                  >
-                    Master Key
+                    {!isVaultConfigured
+                      ? 'Initialize Vault & Enter Desk →'
+                      : 'Authenticate & Enter Desk →'}
                   </button>
                 </div>
               </form>
@@ -433,11 +487,13 @@ export const AdminPanel: React.FC = () => {
 
                     <div>
                       <label className="block font-bold text-[#12203A] uppercase mb-1">
-                        Preferred Initial Passcode
+                        Preferred Security Passcode *
                       </label>
                       <input
                         type="password"
-                        placeholder="Choose password (default: icpep2026)"
+                        required
+                        minLength={6}
+                        placeholder="Choose a secure password (min. 6 characters)"
                         value={reqPasscode}
                         onChange={(e) => setReqPasscode(e.target.value)}
                         className="w-full p-2 bg-white border border-[#CDCDC0] text-xs text-[#12203A] focus:border-[#12203A] focus:outline-hidden"

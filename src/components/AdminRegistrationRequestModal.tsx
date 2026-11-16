@@ -38,6 +38,11 @@ export const AdminRegistrationRequestModal: React.FC<Props> = ({ isOpen, onClose
       return;
     }
 
+    if (passcode.trim().length < 6) {
+      setError('Please choose a security passcode of at least 6 characters.');
+      return;
+    }
+
     const res = requestAdminAccess({
       name: name.trim(),
       email: email.trim().toLowerCase(),
@@ -45,7 +50,7 @@ export const AdminRegistrationRequestModal: React.FC<Props> = ({ isOpen, onClose
       chapterPosition: chapterPosition.trim() || 'Committee Member',
       requestedRole,
       reason: reason.trim(),
-      passcode: passcode.trim() || 'icpep2026',
+      passcode: passcode.trim(),
     });
 
     if (!res.success) {
@@ -209,11 +214,13 @@ export const AdminRegistrationRequestModal: React.FC<Props> = ({ isOpen, onClose
 
               <div>
                 <label className="block text-[#12203A] font-bold uppercase mb-1">
-                  Proposed Security Passcode / Password
+                  Proposed Security Passcode / Password *
                 </label>
                 <input
                   type="password"
-                  placeholder="Set your preferred password (or default: icpep2026)"
+                  required
+                  minLength={6}
+                  placeholder="Choose a secure password (min. 6 characters)"
                   value={passcode}
                   onChange={(e) => setPasscode(e.target.value)}
                   className="w-full p-2 bg-white border border-[#CDCDC0] text-xs text-[#12203A] focus:border-[#12203A] focus:outline-hidden"

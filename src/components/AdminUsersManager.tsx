@@ -69,11 +69,12 @@ export const AdminUsersManager: React.FC = () => {
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [resetPwUser, setResetPwUser] = useState<AdminUser | null>(null);
   const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [resetError, setResetError] = useState<string | null>(null);
 
   // New admin form state
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserPassword, setNewUserPassword] = useState('icpep2026');
+  const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<AdminUserRole>('Secretariat Officer');
   const [newUserPrc, setNewUserPrc] = useState('');
   const [newUserPosition, setNewUserPosition] = useState('');
@@ -132,10 +133,15 @@ export const AdminUsersManager: React.FC = () => {
       return;
     }
 
+    if (newUserPassword.trim().length < 6) {
+      setFormError('Initial passcode must be at least 6 characters.');
+      return;
+    }
+
     addAdminUser({
       name: newUserName.trim(),
       email: newUserEmail.trim().toLowerCase(),
-      password: newUserPassword.trim() || 'icpep2026',
+      passcode: newUserPassword.trim(),
       role: newUserRole,
       prcLicense: newUserPrc.trim() || undefined,
       chapterPosition: newUserPosition.trim() || undefined,
@@ -147,7 +153,7 @@ export const AdminUsersManager: React.FC = () => {
     // Reset & close
     setNewUserName('');
     setNewUserEmail('');
-    setNewUserPassword('icpep2026');
+    setNewUserPassword('');
     setNewUserPrc('');
     setNewUserPosition('');
     setNewUserNotes('');
@@ -156,14 +162,14 @@ export const AdminUsersManager: React.FC = () => {
 
   const handleSavePasswordReset = () => {
     if (!resetPwUser) return;
-    if (!newPasswordInput.trim()) {
-      alert('Password cannot be empty.');
+    setResetError(null);
+    if (newPasswordInput.trim().length < 6) {
+      setResetError('New passphrase must be at least 6 characters.');
       return;
     }
-    updateAdminUser(resetPwUser.id, { password: newPasswordInput.trim() });
+    updateAdminUser(resetPwUser.id, { newPasscode: newPasswordInput.trim() });
     setResetPwUser(null);
     setNewPasswordInput('');
-    alert(`Password for ${resetPwUser.name} has been updated.`);
   };
 
   return (
@@ -1155,8 +1161,8 @@ export const AdminUsersManager: React.FC = () => {
             <ul className="list-disc list-inside space-y-1 text-[#3B475C] text-[11px]">
               <li>All administrative logins and access denials are recorded in the client tamper-evident audit journal.</li>
               <li>Protection rule: The root Chapter Super Admin account cannot be deleted or locked out.</li>
-              <li>All database exports are encrypted with schema verification stamps for regulatory PRC compliance.</li>
-              <li>Emergency fallback passcode (`icpep2026`) is reserved for chapter trustee disaster recovery.</li>
+              <li>All admin passcodes are salted with the officer email and hashed via SHA-256 prior to local storage persistence.</li>
+              <li>Zero plaintext credentials are shipped in source code; emergency chapter overrides may be configured at build time via <code>VITE_ADMIN_PASSCODE_HASH</code>.</li>
             </ul>
           </div>
         </div>
@@ -1222,8 +1228,10 @@ export const AdminUsersManager: React.FC = () => {
                     Initial Password / Passcode *
                   </label>
                   <input
-                    type="text"
+                    type="password"
                     required
+                    minLength={6}
+                    placeholder="Min. 6 characters"
                     value={newUserPassword}
                     onChange={(e) => setNewUserPassword(e.target.value)}
                     className="w-full p-2 bg-white border border-[#CDCDC0] text-xs text-[#12203A] font-bold focus:border-[#12203A] focus:outline-hidden"
@@ -1407,25 +1415,35 @@ export const AdminUsersManager: React.FC = () => {
                 <Key className="w-4 h-4 text-[#C99A2E]" />
                 <span>Reset User Key</span>
               </h3>
-              <button onClick={() => setResetPwUser(null)} className="p-1 hover:bg-[#EEEEE7]">
+              <button onClick={() => { setResetPwUser(null); setResetError(null); }} className="p-1 hover:bg-[#EEEEE7]">
                 ✕
               </button>
             </div>
 
             <div className="space-y-3 font-mono text-xs">
               <p className="text-[#3B475C]">
-                Configure a new passcode or password for <strong>{resetPwUser.name}</strong> ({resetPwUser.email}).
+                Configure a new passphrase for <strong>{resetPwUser.name}</strong> ({resetPwUser.email}). Stored as a SHA-256 hash.
               </p>
+
+              {resetError && (
+                <div className="p-2 bg-[#9C3B2E]/10 border border-[#9C3B2E] text-xs font-mono text-[#9C3B2E]">
+                  {resetError}
+                </div>
+              )}
 
               <div>
                 <label className="block text-[#12203A] font-bold uppercase mb-1">
-                  New Password / Key
+                  New Passphrase / Key *
                 </label>
                 <input
-                  type="text"
+                  type="password"
+                  minLength={6}
                   value={newPasswordInput}
-                  onChange={(e) => setNewPasswordInput(e.target.value)}
-                  placeholder="e.g. OmanCpE#2026"
+                  onChange={(e) => {
+                    setNewPasswordInput(e.target.value);
+                    setResetError(null);
+                  }}
+                  placeholder="Enter new passphrase (min. 6 characters)"
                   className="w-full p-2 bg-white border border-[#CDCDC0] font-bold text-[#12203A] focus:border-[#12203A]"
                   autoFocus
                 />
@@ -1434,7 +1452,7 @@ export const AdminUsersManager: React.FC = () => {
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#CDCDC0]">
                 <button
                   type="button"
-                  onClick={() => setResetPwUser(null)}
+                  onClick={() => { setResetPwUser(null); setResetError(null); }}
                   className="px-3 py-1.5 bg-[#EEEEE7] border border-[#CDCDC0]"
                 >
                   Cancel
